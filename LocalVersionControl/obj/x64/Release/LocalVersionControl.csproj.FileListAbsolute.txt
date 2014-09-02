@@ -1,0 +1,16 @@
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\x64\Release\LocalVersionControl.exe.config
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\x64\Release\LocalVersionControl.exe
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\x64\Release\LocalVersionControl.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\x64\Release\System.Data.SQLite.dll
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\x64\Release\System.Data.SQLite.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Release\LocalVersionControl.exe.config
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Release\LocalVersionControl.exe
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Release\LocalVersionControl.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Release\System.Data.SQLite.dll
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Release\System.Data.SQLite.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.LVControl.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.Properties.Resources.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.SettingsDialog.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.csproj.GenerateResource.Cache
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.exe
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Release\LocalVersionControl.pdb

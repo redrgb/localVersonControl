@@ -1,0 +1,11 @@
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Debug\LocalVersionControl.exe.config
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Debug\LocalVersionControl.exe
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Debug\LocalVersionControl.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Debug\System.Data.SQLite.dll
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\bin\Debug\System.Data.SQLite.pdb
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.LVControl.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.Properties.Resources.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.SettingsDialog.resources
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.csproj.GenerateResource.Cache
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.exe
+D:\Visual Studio 2010\Projects\LocalVersionControl\LocalVersionControl\obj\x64\Debug\LocalVersionControl.pdb

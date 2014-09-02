@@ -1,0 +1,363 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.IO;
+using redrgb.DB;
+using System.Security.Cryptography;
+
+namespace LocalVersionControl
+{
+    public class ModificationRecorder
+    {
+        DirectoryInfo logDirectory;
+        sqlite db;
+        Project pro;
+        public ModificationRecorder(Project pro)
+        {
+            try
+            {
+                this.pro = pro;
+                logDirectory = new DirectoryInfo(pro.Location + @"\" + SettingsStore.Default.logFolderName);
+                if (!logDirectory.Exists)
+                {
+                    logDirectory.Create();
+                    logDirectory.Refresh();
+                    logDirectory.Attributes = logDirectory.Attributes | FileAttributes.Hidden;
+                }
+                db = new sqlite(Path.Combine(logDirectory.FullName, @"changeLog.db"));
+                db.execute("CREATE TABLE IF NOT EXISTS lastState (name, dirID, checksum, snapshot, time DEFAULT (datetime('now')))");
+                db.execute("CREATE TABLE IF NOT EXISTS directories (name, dirID, time DEFAULT (datetime('now')))");
+                db.execute("CREATE TABLE IF NOT EXISTS changeLog (name, dirPath, type, prevState, time DEFAULT (datetime('now')))");
+            }
+            catch
+            {
+
+            }
+        }
+
+        public void update()
+        {
+            updateProcess(pro.Location);
+
+            db.query("SELECT name,dirPath,snapshot FROM lastState");
+
+            object[] values = db.readNext();
+            while (values != null)
+            {
+                if (values.Length > 2)
+                {
+                    string oldpath = Convert.ToString(values[0]);
+                    string oldDir = Convert.ToString(values[1]);
+                    string snapshot = Convert.ToString(values[2]);
+                    if (!File.Exists(Path.Combine(oldDir, oldpath)))
+                    {
+                        SqliteParameters parm;
+                        parm = new SqliteParameters();
+
+                        parm.add("@curName", oldpath);
+                        parm.add("@prev", snapshot);
+                        parm.add("@changeType", WatcherChangeTypes.Deleted);
+                        parm.add("@curDirectory", oldDir);
+                        db.execute(@"DELETE FROM lastState WHERE name=@curName AND dirPath=@curDirectory", parm);
+                        db.execute("INSERT INTO changeLog (name,dirPath, type, prevState) VALUES (@curName, @curDirectory,@changeType,@prev)", parm);
+                    }
+                }
+                values = db.readNext();
+            }
+
+        }
+        private void updateProcess(string path, bool root = true)
+        {
+            if (!pro.excludeLocationContains(path))
+            {
+                // Process the list of files found in the directory.
+                string[] fileEntries = Directory.GetFiles(path);
+                foreach (string fileName in fileEntries)
+                {
+                    if (!pro.excludeLocationContains(path))
+                    {
+                        SqliteParameters parm = new SqliteParameters();
+                        string check = Checksum(fileName);
+                        parm.add("@newCheck", check);
+                        if (checkFileChange(fileName, check))
+                        {
+                            string prevSnapshot = "";
+                            parm.add("@curName", Path.GetFileName(fileName));
+                            parm.add("@newChecksum", check);
+                            parm.add("@newSnapshot", makeSnapshot(fileName));
+                            parm.add("@directory", Path.GetDirectoryName(fileName));
+                            db.query("SELECT snapshot FROM lastState WHERE name=@curName AND dirPath=@directory", parm);
+                            if (db.hasRows())
+                            {
+                                object[] values = db.readNext();
+                                if (values.Length > 0)
+                                    prevSnapshot = Convert.ToString(values[0]);
+                                db.execute("UPDATE lastState SET checksum=@newCheck,snapshot=@newSnapshot, time=(datetime('now')) WHERE name=@curName AND dirPath=@directory", parm);
+                                parm.add("@changeType", WatcherChangeTypes.Changed);
+                                parm.add("@prev", prevSnapshot);
+                            }
+                            else
+                            {
+                                db.execute("INSERT INTO lastState (name,dirPath,snapshot, checksum) VALUES (@curName,@directory,@newSnapshot,@newChecksum)", parm);
+                                parm.add("@changeType", WatcherChangeTypes.Created);
+                                parm.add("@prev", "");
+                            }
+
+                            db.execute("INSERT INTO changeLog (name,dirPath, type, prevState) VALUES (@curName,@directory,@changeType,@prev)", parm);
+                        }
+                    }
+                }
+
+                // Recurse into subdirectories of this directory.
+                string[] subdirEntries = Directory.GetDirectories(path);
+                foreach (string subdir in subdirEntries)
+                {
+                    // Do not iterate through reparse points
+                    if ((File.GetAttributes(subdir) & FileAttributes.ReparsePoint) != FileAttributes.ReparsePoint)
+                    {
+                        //DirectoryInfo dir = new DirectoryInfo(subdir);
+                        updateProcess(subdir, false);
+                    }
+                }
+            }
+        }
+        private string Checksum(string fileName)
+        {
+            MD5 md5 = null;
+            FileStream stream = null;
+            try
+            {
+                md5 = MD5.Create();
+                stream = File.OpenRead(fileName);
+                return Convert.ToBase64String(md5.ComputeHash(stream));
+            }
+            catch
+            {
+                return "";
+            }
+            finally
+            {
+                if (md5 != null)
+                {
+                    md5.Dispose();
+                }
+                if (stream != null)
+                {
+                    stream.Close();
+                }
+            }
+
+
+        }
+        private bool checkFileChange(string filepath, string newchecksum)
+        {
+            SqliteParameters parm = new SqliteParameters();
+            parm.add("@curName", Path.GetFileName(filepath));
+            parm.add("@newCheck", newchecksum);
+            parm.add("@directory", Path.GetDirectoryName(filepath));
+            db.query(@"SELECT name FROM lastState WHERE name=@curName AND dirPath=@directory AND checksum=@newCheck", parm);
+            return !db.hasRows();
+        }
+
+
+        private string makeSnapshot(string path)
+        {
+            string snapshotPath = Path.Combine(logDirectory.FullName, "snapshots");
+            if (!Directory.Exists(snapshotPath))
+            {
+                Directory.CreateDirectory(snapshotPath);
+            }
+            string fileName = Path.Combine(snapshotPath, DateTime.Now.ToString("yyyy-MM-d--HH-mm-ss") + "_" + Path.GetFileName(path));
+
+            if (File.Exists(fileName))
+            {
+                fileName = Path.Combine(snapshotPath, DateTime.Now.ToString("yyyy-MM-d--HH-mm-ss") + "_" + Guid.NewGuid().ToString() + "_" + Path.GetFileName(path));
+            }
+            File.Copy(path, fileName, false);
+            return fileName;
+        }
+
+        public void notifyFileChange(string path, WatcherChangeTypes type, string renamePath = "")
+        {
+            if (!Path.GetFullPath(path).ToLower().Contains(SettingsStore.Default.logFolderName.ToLower()))
+            {
+                try
+                {
+                    switch (type)
+                    {
+                        case WatcherChangeTypes.Changed:
+                            changeFileFolder(path);
+                            break;
+                        case WatcherChangeTypes.Created:
+                            addFileFolder(path);
+                            break;
+                        case WatcherChangeTypes.Deleted:
+                            deleteFileFolder(path);
+                            break;
+                        case WatcherChangeTypes.Renamed:
+                            renameFileFolder(path, renamePath);
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                }
+                catch
+                {
+
+                }
+
+            }
+        }
+        public void addFileFolder(string path)
+        {
+            SqliteParameters parm = new SqliteParameters();
+            parm.add("@changeType", WatcherChangeTypes.Created);
+            if (File.Exists(path))
+            {
+                parm.add("@directory", Path.GetDirectoryName(path));
+                string check = Checksum(path);
+                parm.add("@curName", Path.GetFileName(path));
+                parm.add("@newCheck", check);
+                parm.add("@newSnapshot", makeSnapshot(path));
+                parm.add("@prev", "");
+                db.execute("INSERT INTO lastState (name, dirID, snapshot, checksum) VALUES (@curName,(SELECT rowid FROM directories WHERE name=@directory),@newSnapshot,@newCheck)", parm);
+            }
+            else if (Directory.Exists(path))
+            {
+                parm.add("@directory", Path.GetDirectoryName(path));
+                //string check = Checksum(path);
+                parm.add("@curName", Path.GetFileName(path));
+               // parm.add("@newCheck", check);
+                //parm.add("@newSnapshot", makeSnapshot(path));
+                parm.add("@prev", "");
+                db.execute("INSERT INTO directories (name, dirID) VALUES (@curName, (SELECT rowid FROM directories WHERE name=@directory))", parm);
+            }
+            db.execute("INSERT INTO changeLog (name, dirPath, type, prevState) VALUES (@curName,@directory,@changeType,@prev)", parm);
+        }
+        public void deleteFileFolder(string path)
+        {
+            SqliteParameters parm = new SqliteParameters();
+            parm.add("@changeType", WatcherChangeTypes.Deleted);
+            parm.add("@curName", Path.GetFileName(path));
+            parm.add("@curDir", Path.GetDirectoryName(path));
+            parm.add("@fullPath", path);
+            db.query("SELECT snapshot FROM lastState WHERE name=@curName AND dirPath=@curDir", parm);
+            string prevSnapshot = "";
+            if (db.hasRows())
+            {
+                object[] values = db.readNext();
+                if (values.Length > 0)
+                    prevSnapshot = Convert.ToString(values[0]);
+                //if (File.Exists(path))
+               // {
+                    db.execute(@"DELETE FROM lastState WHERE name=@curName AND dirPath=@curDir", parm);
+               // }
+            
+                    parm.add("@prev", prevSnapshot);
+                    db.execute("INSERT INTO changeLog (name,dirPath, type, prevState) VALUES (@curName,@curDir,@changeType,@prev)", parm);
+            }
+            if (Directory.Exists(path))
+            {
+                parm.add(@"fileName", "");
+                parm.add(@"snapshot", "");
+                db.query("SELECT name,snapshot FROM lastState AS file JOIN directories AS dir ON file.dirID=dir.rowID WHERE dir.name=@fullPath", parm);
+                object[] values = db.readNext();
+                while (values != null)
+                {
+                    if (values.Length > 1)
+                    {
+                        string name = Convert.ToString(values[0]);
+                        string snapshot = Convert.ToString(values[1]);
+                        parm.edit(@"fileName", name);
+                        parm.edit("@snapshot", snapshot);
+                        db.execute("INSERT INTO changeLog (name, dirPath, type, prevState) VALUES (@curName, @curDir, @changeType, @snapshot)", parm);
+                    }
+                    values = db.readNext();
+                }
+                db.execute(@"DELETE FROM lastState AS file JOIN directories AS dir ON file.dirID=dir.rowID WHERE dir.name=@fullPath", parm);
+                  db.execute("INSERT INTO changeLog (name, dirPath, type) VALUES (@curName, @curDir, @changeType)", parm);
+            }
+
+        }
+
+        private void renameFileFolder(string oldPath,string newPath)
+        {
+            SqliteParameters parm = new SqliteParameters();
+            parm.add("@changeType", WatcherChangeTypes.Renamed);
+            parm.add("@oldName", Path.GetFileName(oldPath));
+            parm.add("@oldDir", Path.GetDirectoryName(oldPath));
+            parm.add("@newName", Path.GetFileName(newPath));
+            parm.add("@newDir", Path.GetDirectoryName(newPath));
+
+            parm.add("@oldFullPath", oldPath);
+            
+
+            if (File.Exists(newPath))
+            {
+                db.execute("UPDATE lastState SET name=@newName WHERE name=@oldName AND dirID=(SELECT rowid FROM directories WHERE name=@oldDir)", parm);
+               // db.execute("UPDATE lastState SET name=@newName WHERE name=@oldName AND dirPath=@oldDir", parm);//, dirPath=@newDir
+            }
+            else if (Directory.Exists(newPath))
+            {
+                parm.add("@newFullPath", newPath);
+               // parm.add("@oldFullPath", oldPath);
+                db.execute("UPDATE directories SET name=@newFullPath WHERE name=@oldFullPath", parm);
+                
+                db.execute("UPDATE directories SET dirPath=@newFullPath WHERE dirPath=@oldFullPath", parm);//dirID=(SELECT rowid FROM directories WHERE 
+
+            }
+            db.execute("INSERT INTO changeLog (name,dirPath, type, prevState) VALUES (@newName,@newDir,@changeType,@oldFullPath)", parm);
+        }
+        private void changeFileFolder(string path)
+        {
+            SqliteParameters parm = new SqliteParameters();
+            parm.add("@changeType", WatcherChangeTypes.Changed);
+            if (File.Exists(path))
+            {
+                string prevSnapshot = "";
+                parm.add("@curName", Path.GetFileName(path));
+                parm.add("@dirPath", Path.GetDirectoryName(path));
+                
+                string check = Checksum(path);
+                parm.add("@newCheck", check);
+                if (checkFileChange(path, check))
+                {
+                    parm.add("@newSnapshot", makeSnapshot(path));
+                    db.query("SELECT snapshot FROM lastState WHERE name=@curName AND dirPath=@dirPath", parm);
+
+                    if (db.hasRows())
+                    {
+                        object[] values = db.readNext();
+                        if (values.Length > 0)
+                            prevSnapshot = Convert.ToString(values[0]);
+                        db.execute("UPDATE lastState SET checksum=@newCheck,snapshot=@newSnapshot, dirPath=@dirPath,time=(datetime('now')) WHERE name=@curName AND dirPath=@dirPath", parm);
+                    }
+                    else
+                    {
+                        db.execute("INSERT INTO lastState (name, dirPath, snapshot, checksum) VALUES (@curName, @dirPath,@newSnapshot,@newCheck)", parm);
+                    }
+
+                    parm.add("@prev", prevSnapshot);
+                    db.execute("INSERT INTO changeLog (name,dirPath, type, prevState) VALUES (@curName,@dirPath,@changeType,@prev)", parm);
+                }
+                   
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                return;
+            }
+        }
+    }
+
+    struct folderItem
+    {
+        Dictionary<string, string> contents;
+
+    }
+}

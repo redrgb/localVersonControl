@@ -1,0 +1,15 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="LocalVersionControl" GeneratedClassName="SettingsStore">
+  <Profiles />
+  <Settings>
+    <Setting Name="DefaultLocation" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="DefaultExclude" Type="System.String" Scope="User">
+      <Value Profile="(Default)">exe</Value>
+    </Setting>
+    <Setting Name="logFolderName" Type="System.String" Scope="User">
+      <Value Profile="(Default)">.LVCControlLog</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
